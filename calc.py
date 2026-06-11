@@ -101,7 +101,7 @@ def simulate_strategy(principal, rate_pct, total_months, start_date, min_pmt, ma
 
 # --- Интерфейс (Боковая панель) ---
 st.sidebar.markdown("### 1. Параметры кредита")
-loan = st.sidebar.number_input("Сумма кредита (₽)", value=9000000, step=100000)
+loan = st.sidebar.number_input("Сумма кредита (₽)", value=5000000, step=100000)
 rate = st.sidebar.number_input("Ставка (% годовых)", value=20.0, step=0.1)
 years = st.sidebar.number_input("Срок (лет)", value=20, step=1)
 start_date = st.sidebar.date_input("Дата выдачи", value=datetime.date.today())
@@ -111,7 +111,7 @@ st.sidebar.markdown("### 2. Ваша стратегия")
 inflation = st.sidebar.number_input("Ожидаемая инфляция (% год)", value=8.0, step=0.1)
 target_overpay = st.sidebar.number_input("Целевая реальная переплата (₽)", value=4500000, step=100000)
 st.sidebar.caption("Максимум, который вы готовы 'потерять' в покупательной способности денег.")
-max_pmt = st.sidebar.number_input("Ваш Максимальный платеж (₽)", value=300000, step=10000)
+max_pmt = st.sidebar.number_input("Ваш Максимальный платеж (₽)", value=150000, step=10000)
 
 calculate_btn = st.sidebar.button("Рассчитать и сравнить", type="primary", use_container_width=True)
 
