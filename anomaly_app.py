@@ -401,7 +401,8 @@ def build_annotated(wb, ws, qcol, clients, flags):
 
 # Цветовая схема подтипов когорт (единая для круговой диаграммы и карты распределения)
 SUBTYPE_DOMAIN = ["🔥 Взрывной рост", "🚀 Выше рынка", "🤝 В рынке", "📉 Ниже рынка"]
-SUBTYPE_RANGE = ["#E67E22", "#2ECC71", "#F1C40F", "#E74C3C"]
+# SUBTYPE_RANGE = ["#E67E22", "#2ECC71", "#F1C40F", "#E74C3C"]
+SUBTYPE_RANGE = ["#196F3D", "#2ECC71", "#F1C40F", "#E74C3C"]
 
 
 def render_cohort_facets(cohort_label, clients, quarters, method, breakout_thr, breakout_min_slope,
