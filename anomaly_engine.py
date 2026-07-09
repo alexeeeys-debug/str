@@ -126,7 +126,7 @@ def analyze_clients(clients, min_history=MIN_HISTORY, z_thr=Z_THRESHOLD,
     out = list(flags.values())
     out.sort(key=lambda f: f['severity'], reverse=True)
     for f in out:
-        f['level'] = 'Высокая' if f['severity'] >= 0.60 else 'Средняя' if f['severity'] >= 0.42 else 'Низкая'
+        f['level'] = 'Высокая' if f['severity'] >= 0.60 else 'Средняя' if f['severity'] >= 0.35 else 'Низкая'
     return out
 
 
