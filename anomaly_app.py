@@ -478,6 +478,25 @@ def main():
                                           disabled=not enable_trailing)
         pct_threshold = st.number_input("Порог отклонения от медианы, %", min_value=1.0, max_value=500.0, value=50.0,
                                         step=5.0, disabled=not enable_trailing)
+        st.caption("Форс-перевод «Низкая» → «Средняя» по этому блоку применяется только к "
+                   "материальным отклонениям (значимым и в %, и в рублях одновременно):")
+        trailing_force_pct = st.slider("Вторичный порог отклонения (форс), %", min_value=10, max_value=300,
+                                       value=70, step=5, disabled=not enable_trailing,
+                                       help="Форсируем «Среднюю» только если |отклонение| ≥ этого значения.")
+        trailing_force_abs = st.slider("Рублёвый пол абс. отклонения (форс), ₽", min_value=0, max_value=1_000_000,
+                                       value=5_000, step=1_000, format="%d", disabled=not enable_trailing,
+                                       help="И одновременно абс. отклонение от медианы ≥ этого значения.")
+
+        st.divider()
+        st.subheader("Повышение «Низкой» по сумме")
+        enable_abs_dev = st.checkbox(
+            "Повышать «Низкая» → «Средняя» по абс. отклонению (₽)", value=True,
+            help="Для позиций с низкой серьёзностью считается абсолютное отклонение "
+                 "в рублях от ожидаемого уровня клиента (медианы истории). Если оно "
+                 "превышает уставку, серьёзность принудительно повышается до «Средняя».")
+        abs_dev_thr = st.slider(
+            "Уставка абс. отклонения, ₽", min_value=0, max_value=5_000_000,
+            value=100_000, step=10_000, format="%d", disabled=not enable_abs_dev)
 
         st.divider()
         st.subheader("Взрывной рост")
@@ -531,7 +550,10 @@ def main():
     with st.spinner(f"Анализ {len(clients)} клиентов…"):
         flags = analyze_clients(clients, min_history, z_thr, ratio_thr, z_thr, quarters,
                                 trailing_window=int(trailing_window), pct_threshold=float(pct_threshold),
-                                enable_trailing=bool(enable_trailing))
+                                enable_trailing=bool(enable_trailing),
+                                abs_dev_thr=float(abs_dev_thr), enable_abs_dev_upgrade=bool(enable_abs_dev),
+                                trailing_force_pct=float(trailing_force_pct),
+                                trailing_force_abs=float(trailing_force_abs))
 
     status_placeholder.success("Готово")
     st.divider()

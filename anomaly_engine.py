@@ -19,11 +19,17 @@ MIN_HISTORY = 6
 Z_THRESHOLD = 3.5
 RATIO_THRESHOLD = 8
 PEER_Z_THRESHOLD = 3.5
+ABS_DEV_THRESHOLD = 100_000.0  # уставка абсолютного отклонения в рублях
+TRAILING_FORCE_PCT = 70.0      # вторичный порог %, выше которого форсируем «Среднюю»
+TRAILING_FORCE_ABS = 5_000.0   # рублёвый пол абс. отклонения для форс-перевода
 
 
 def analyze_clients(clients, min_history=MIN_HISTORY, z_thr=Z_THRESHOLD,
                     ratio_thr=RATIO_THRESHOLD, peer_z_thr=PEER_Z_THRESHOLD, quarters=None,
-                    trailing_window=3, pct_threshold=10.0, enable_trailing=True):
+                    trailing_window=3, pct_threshold=10.0, enable_trailing=True,
+                    abs_dev_thr=ABS_DEV_THRESHOLD, enable_abs_dev_upgrade=True,
+                    trailing_force_pct=TRAILING_FORCE_PCT,
+                    trailing_force_abs=TRAILING_FORCE_ABS):
     flags = {}
     peer = {}
     for c in clients:
@@ -107,6 +113,11 @@ def analyze_clients(clients, min_history=MIN_HISTORY, z_thr=Z_THRESHOLD,
                         f"Отклонение {pct:+.0f}% от медианы за последние {len(prev)} кв. "
                         f"(медиана={base:,.0f}, порог {pct_threshold:.0f}%)",
                         1 if pct > 0 else -1)
+                    # позиция попала в фокус из-за проверки по медиане.
+                    # Форсируем минимум «Средняя» ТОЛЬКО если отклонение значимо
+                    # одновременно в процентах и в рублях (фильтр материальности).
+                    if abs(pct) >= trailing_force_pct and abs(v - base) >= trailing_force_abs:
+                        flags[(cid, quarters[i])]['from_trailing'] = True
 
         if not has_own:
             ps = peer_stat.get((ct, rs))
@@ -126,7 +137,37 @@ def analyze_clients(clients, min_history=MIN_HISTORY, z_thr=Z_THRESHOLD,
     out = list(flags.values())
     out.sort(key=lambda f: f['severity'], reverse=True)
     for f in out:
-        f['level'] = 'Высокая' if f['severity'] >= 0.60 else 'Средняя' if f['severity'] >= 0.35 else 'Низкая'
+        # позиции из блока «отклонение от медианы» — минимум «Средняя»
+        if f.get('from_trailing'):
+            f['severity'] = max(f['severity'], 0.42)
+        f['level'] = 'Высокая' if f['severity'] >= 0.60 else 'Средняя' if f['severity'] >= 0.42 else 'Низкая'
+
+    # --- Бизнес-правило: принудительное повышение «Низкая» -> «Средняя» ---
+    # Для позиций с низкой серьёзностью считаем абсолютное отклонение в рублях
+    # от ожидаемого уровня клиента (медиана положительной истории). Если оно
+    # превышает уставку, серьёзность повышается до «Средняя».
+    if enable_abs_dev_upgrade and abs_dev_thr is not None:
+        baseline_by_id = {}
+        for c in clients:
+            s_ = c['series']
+            pos_ = s_[(~np.isnan(s_)) & (s_ > 0)]
+            baseline_by_id[str(c['id'])] = float(np.median(pos_)) if len(pos_) else None
+        for f in out:
+            base = baseline_by_id.get(f['client_id'])
+            if base is None:
+                continue
+            abs_dev = abs(float(f['value']) - base)
+            f['abs_dev'] = abs_dev
+            f['baseline'] = base
+            if f['level'] == 'Низкая' and abs_dev > abs_dev_thr:
+                f['level'] = 'Средняя'
+                f['forced_mid'] = True
+                # держим числовую серьёзность согласованной с меткой уровня
+                f['severity'] = max(f['severity'], 0.42)
+                f['reasons'].append(
+                    f"Абс. отклонение {abs_dev:,.0f} ₽ от ожидаемого уровня "
+                    f"({base:,.0f} ₽) превышает уставку {abs_dev_thr:,.0f} ₽ "
+                    f"→ серьёзность повышена до «Средняя»")
     return out
 
 
