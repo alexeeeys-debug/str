@@ -737,6 +737,79 @@ def main():
                                  na_rep='—'),
             height=220, use_container_width=True)
 
+        # --- Выгрузка таблицы в Excel ---
+        out_excel_all = io.BytesIO()
+        with pd.ExcelWriter(out_excel_all, engine='openpyxl') as writer:
+            export_cols = ['ID', 'Тип', 'Подтип', 'Рост клиента', 'Отрыв от рынка', 'Темп посл.',
+                           'Квартал перегиба']
+            df_export_all = df_clients[export_cols].copy()
+
+            df_export_all = df_export_all.rename(columns={'Подтип': 'Когорта (Статус)'})
+
+            # Убираем эмодзи
+            df_export_all['Когорта (Статус)'] = (
+                df_export_all['Когорта (Статус)']
+                .str.replace('🔥 ', '')
+                .str.replace('🚀 ', '')
+                .str.replace('🤝 ', '')
+                .str.replace('📉 ', '')
+            )
+
+            order_map = {"Взрывной рост": 1, "Выше рынка": 2, "В рынке": 3, "Ниже рынка": 4}
+            df_export_all['sort_order'] = df_export_all['Когорта (Статус)'].map(order_map).fillna(5)
+            df_export_all = df_export_all.sort_values(by=['sort_order', 'ID']).drop(columns=['sort_order'])
+
+            sheet_name = 'Все_когорты'
+            df_export_all.to_excel(writer, index=False, sheet_name=sheet_name)
+
+            ws = writer.sheets[sheet_name]
+
+            # Импортируем нужные классы для дизайна
+            from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
+
+            # Настраиваем стили
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                                 top=Side(style='thin'), bottom=Side(style='thin'))
+            header_fill = PatternFill(start_color='1F497D', end_color='1F497D',
+                                      fill_type='solid')  # Темно-синий как на скрине
+            header_font = Font(color='FFFFFF', bold=True)
+            header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+
+            # 1. Делаем шапку пошире (увеличиваем высоту строки)
+            ws.row_dimensions[1].height = 35
+
+            # 2. Проходимся по всем ячейкам таблицы
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.border = thin_border  # Добавляем сетку всем ячейкам
+
+                    if cell.row == 1:
+                        # Красим шапку
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = header_align
+                    else:
+                        # Если это число и не колонка с ID (column != 1), оставляем 2 знака
+                        if isinstance(cell.value, (int, float)) and cell.column != 1:
+                            cell.number_format = '0.00'
+
+            # 3. Настройка автоширины колонок (с небольшим запасом)
+            for col in ws.columns:
+                max_len = max((len(str(cell.value)) for cell in col if cell.value is not None), default=10)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 3, 50)
+
+            # 4. Включаем автофильтры
+            ws.auto_filter.ref = ws.dimensions
+
+        st.download_button(
+            label="⬇ Скачать всех клиентов (все когорты) в Excel",
+            data=out_excel_all.getvalue(),
+            file_name="all_cohorts_analytics.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            help="Нажмите, чтобы скачать полный список клиентов с указанием их когорты"
+        )
+        # ---------------------------------------------------
+
         st.divider()
         st.subheader("Сравнение клиента с рынком")
         st.caption(
